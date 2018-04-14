@@ -10,4 +10,5 @@ impl LshError {
 
 pub enum Status {
     Success,
+    Exit
 }
