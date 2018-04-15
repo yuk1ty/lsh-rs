@@ -1,10 +1,10 @@
 pub struct LshError {
-    pub message: &'static str,
+    pub message: String,
 }
 
 impl LshError {
-    pub fn new(message: &'static str) -> LshError {
-        LshError { message }
+    pub fn new(message: &str) -> LshError {
+        LshError { message: message.to_string() }
     }
 }
 
