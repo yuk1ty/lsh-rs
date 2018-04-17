@@ -1,8 +1,10 @@
-use std::io;
-use nix::unistd::*;
-use std::path::*;
 use lsh::common::*;
+use std::io;
+use std::ffi::CString;
+use std::path::*;
 use std::str::FromStr;
+use nix::unistd::*;
+use nix::sys::wait::*;
 
 pub mod common;
 
@@ -66,7 +68,7 @@ fn execute(args: Vec<String>) -> Result<Status, LshError> {
         Commands::Cd => lsh_cd(&args[1]),
         Commands::Help => lsh_help(),
         Commands::Exit => lsh_exit(),
-        Commands::Execute => Ok(Status::Exit)
+        Commands::Execute => lsh_launch(args),
     })
 }
 
@@ -90,4 +92,30 @@ fn lsh_help() -> Result<Status, LshError> {
 
 fn lsh_exit() -> Result<Status, LshError> {
     Ok(Status::Exit)
+}
+
+fn lsh_launch(args: Vec<String>) -> Result<Status, LshError> {
+    let pid = fork().map_err(|_| LshError::new("fork failed"))?;
+    match pid {
+        ForkResult::Parent { child } => loop {
+            let wait_pid = waitpid(child, None).map_err(|_| LshError::new("failed to waitpid."));
+            let r = match wait_pid {
+                Ok(WaitStatus::Exited(_, _)) => Ok(Status::Success),
+                Ok(WaitStatus::Signaled(_, _, _)) => Ok(Status::Success),
+                _ => Err(LshError::new("EXITED")),
+            };
+
+            if r.is_err() {
+                return r;
+            }
+        },
+        ForkResult::Child => {
+            let dir = CString::new(args[1].to_string()).unwrap();
+            let args = CString::new(args[2].to_string()).unwrap();
+            match execv(&dir, &[dir.clone(), args]) {
+                Ok(_) => Ok(Status::Success),
+                Err(_) => Err(LshError::new("Child Process failed")),
+            }
+        }
+    }
 }
