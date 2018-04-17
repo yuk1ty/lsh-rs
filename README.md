@@ -1,0 +1,2 @@
+# LSH-RS
+LSH-RS is a simple implementation of a shell in Rust. It inspired by [LSH](https://brennan.io/2015/01/16/write-a-shell-in-c/). Commands (`read`, `parse`, `fork`, `exec` and `wait`) are able to run. Some limitations depend on LSH itsself.
