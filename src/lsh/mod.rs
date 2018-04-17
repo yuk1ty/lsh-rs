@@ -112,10 +112,9 @@ fn lsh_launch(args: Vec<String>) -> Result<Status, LshError> {
         ForkResult::Child => {
             let dir = CString::new(args[1].to_string()).unwrap();
             let args = CString::new(args[2].to_string()).unwrap();
-            match execv(&dir, &[dir.clone(), args]) {
-                Ok(_) => Ok(Status::Success),
-                Err(_) => Err(LshError::new("Child Process failed")),
-            }
+            execv(&dir, &[dir.clone(), args])
+                .map(|_| Status::Success)
+                .map_err(|_| LshError::new("Child Process failed"))
         }
     }
 }
