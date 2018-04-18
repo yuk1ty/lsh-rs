@@ -3,6 +3,7 @@ use std::io;
 use std::ffi::CString;
 use std::path::*;
 use std::str::FromStr;
+use std::fmt;
 use nix::unistd::*;
 use nix::sys::wait::*;
 
@@ -42,6 +43,17 @@ pub enum Commands {
     Execute,
 }
 
+impl Commands {
+    fn values() -> Vec<String> {
+        vec![
+            Commands::Cd.to_string(),
+            Commands::Help.to_string(),
+            Commands::Exit.to_string(),
+            Commands::Execute.to_string(),
+        ]
+    }
+}
+
 impl FromStr for Commands {
     type Err = LshError;
 
@@ -55,6 +67,20 @@ impl FromStr for Commands {
         } else {
             Ok(Commands::Execute)
         }
+    }
+}
+
+impl fmt::Display for Commands {
+    fn fmt(&self, _f: &mut fmt::Formatter) -> fmt::Result {
+        Ok(println!(
+            "{}",
+            match *self {
+                Commands::Cd => "cd",
+                Commands::Help => "help",
+                Commands::Exit => "exit",
+                Commands::Execute => "execute",
+            }
+        ))
     }
 }
 
@@ -98,21 +124,21 @@ fn lsh_launch(args: Vec<String>) -> Result<Status, LshError> {
     let pid = fork().map_err(|_| LshError::new("fork failed"))?;
     match pid {
         ForkResult::Parent { child } => loop {
-            let wait_pid = waitpid(child, None).map_err(|_| LshError::new("failed to waitpid."));
-            let r = match wait_pid {
+            let wait_pid_result = waitpid(child, None).map_err(|_| LshError::new("failed to waitpid."));
+            let result = match wait_pid_result {
                 Ok(WaitStatus::Exited(_, _)) => Ok(Status::Success),
                 Ok(WaitStatus::Signaled(_, _, _)) => Ok(Status::Success),
                 _ => Err(LshError::new("EXITED")),
             };
 
-            if r.is_err() {
-                return r;
+            if result.is_err() {
+                return result;
             }
         },
         ForkResult::Child => {
-            let dir = CString::new(args[1].to_string()).unwrap();
+            let path = CString::new(args[1].to_string()).unwrap();
             let args = CString::new(args[2].to_string()).unwrap();
-            execv(&dir, &[dir.clone(), args])
+            execv(&path, &[path.clone(), args])
                 .map(|_| Status::Success)
                 .map_err(|_| LshError::new("Child Process failed"))
         }
