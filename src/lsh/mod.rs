@@ -123,21 +123,23 @@ fn lsh_exit() -> Result<Status, LshError> {
 fn lsh_launch(args: Vec<String>) -> Result<Status, LshError> {
     let pid = fork().map_err(|_| LshError::new("fork failed"))?;
     match pid {
-        ForkResult::Parent { child } => loop {
-            let wait_pid_result = waitpid(child, None).map_err(|_| LshError::new("failed to waitpid."));
-            let result = match wait_pid_result {
+        ForkResult::Parent { child } => {
+            let wait_pid_result =
+                waitpid(child, None).map_err(|err| LshError::new(&format!("{}", err)));
+            match wait_pid_result {
                 Ok(WaitStatus::Exited(_, _)) => Ok(Status::Success),
                 Ok(WaitStatus::Signaled(_, _, _)) => Ok(Status::Success),
-                _ => Err(LshError::new("EXITED")),
-            };
-
-            if result.is_err() {
-                return result;
+                Err(err) => Err(LshError::new(&err.message)),
+                _ => Ok(Status::Success),
             }
-        },
+        }
         ForkResult::Child => {
-            let path = CString::new(args[1].to_string()).unwrap();
-            let args = CString::new(args[2].to_string()).unwrap();
+            let path = CString::new(args[0].to_string()).unwrap();
+            let args = if args.len() > 1 {
+                CString::new(args[1].to_string()).unwrap()
+            } else {
+                CString::new("").unwrap()
+            };
             execv(&path, &[path.clone(), args])
                 .map(|_| Status::Success)
                 .map_err(|_| LshError::new("Child Process failed"))
